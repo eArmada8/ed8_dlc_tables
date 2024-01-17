@@ -103,8 +103,9 @@ def read_item_table(item_table, game_type = 4):
                 if section_data[i]['name'] == 'item':
                     item = {}
                     item['item_id'], item['chr_id'] = struct.unpack("<2h", f.read(4))
+                    item['flags'] = read_null_terminated_string(f)
                     if game_type == 5:
-                        f.seek(4,1)
+                        f.seek(2,1)
                         item['item_type'], = struct.unpack("<H", f.read(2))
                         f.seek(9,1)
                         item['target_type'], = struct.unpack("<B", f.read(1))
@@ -112,7 +113,7 @@ def read_item_table(item_table, game_type = 4):
                         item['item_sort_id'], = struct.unpack("<H", f.read(2))
                         f.seek(2,1)
                     elif game_type == 4:
-                        f.seek(4,1)
+                        f.seek(2,1)
                         item['item_type'], = struct.unpack("<H", f.read(2))
                         f.seek(8,1)
                         item['target_type'], = struct.unpack("<B", f.read(1))
@@ -120,7 +121,6 @@ def read_item_table(item_table, game_type = 4):
                         item['item_sort_id'], = struct.unpack("<H", f.read(2))
                         f.seek(2,1)
                     elif game_type == 3:
-                        f.seek(2,1)
                         item['item_type'], = struct.unpack("<H", f.read(2))
                         f.seek(8,1)
                         item['target_type'], = struct.unpack("<B", f.read(1))
@@ -163,7 +163,7 @@ def write_pkg_jsons(attaches, items, dlcs):
                 item_quantity = sum([x[1] for x in matching_dlcs[0]['items'] if x[0] == item['item_id']])
                 write_struct_to_json({'item_id': item['item_id'],\
                     'item_type': item['item_type'], 'item_name': item['item_name'], 'item_desc': item['item_desc'],\
-                    'target_type': item['target_type'], 'attach_point': attach['attach_point'],\
+                    'flags': item['flags'], 'target_type': item['target_type'], 'attach_point': attach['attach_point'],\
                     'chr_id': item['chr_id'], 'chr_id_a': attach['char_id'], 'item_sort_id': item['item_sort_id'],\
                     'item_cs4rev_scraft_cutin': (item['item_cs4rev_scraft_cutin'] if 'item_cs4rev_scraft_cutin' in item else 0),\
                     'rev_voice_flag': (item['rev_voice_flag'] if 'rev_voice_flag' in item else 0),\
