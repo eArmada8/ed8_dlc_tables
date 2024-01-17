@@ -205,6 +205,11 @@ class dlc_table_maker:
                         pkg_details['item_quantity'] = min(max(int(item_quant_raw),1),99)
                     except ValueError:
                         print("Invalid entry!")
+            while 'flags' not in pkg_details.keys():
+                if pkg_details['chr_id'] != 0xFFFF and pkg_details['item_quantity'] < 99:
+                    pkg_details['flags'] = 'S{}'.format(pkg_details['item_quantity'])
+                else:
+                    pkg_details['flags'] = '0'
             pkg_dict[packages[i]] = pkg_details
             if pkg_details['item_id'] not in list(existing_items.keys()):
                 existing_items[pkg_details['item_id']] = pkg_details
@@ -222,21 +227,22 @@ class dlc_table_maker:
 
     def make_item_entry (self, pkg_name):
         item_tbl_entry = struct.pack("<2H", self.packages[pkg_name]['item_id'], self.packages[pkg_name]['chr_id'])
+        item_tbl_entry += self.packages[pkg_name]['flags'].encode() + b'\x00'
         if self.dlc_details['game_type'] == 5: #NISA Reverie
-            item_tbl_entry += struct.pack("<3H", 48, 0, self.packages[pkg_name]['item_type'])
+            item_tbl_entry += struct.pack("<2H", 0, self.packages[pkg_name]['item_type'])
             item_tbl_entry += struct.pack("<B4H", *[0]*5)
             item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
             item_tbl_entry += struct.pack("<B59H", *[0]*60)
             # The first two numbers are constant and same as CS4, the second two seem random, maybe sorting or a timestamp?
             item_tbl_entry += struct.pack("<4H", 99, 0, self.packages[pkg_name]['item_sort_id'], 32)
         elif self.dlc_details['game_type'] == 3: #CS3
-            item_tbl_entry += struct.pack("<2H", 48, self.packages[pkg_name]['item_type'])
+            item_tbl_entry += struct.pack("<H", self.packages[pkg_name]['item_type'])
             item_tbl_entry += struct.pack("<4H", *[0]*4)
             item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
             item_tbl_entry += struct.pack("<B55H", *[0]*56)
             item_tbl_entry += struct.pack("<BHH", 99, self.packages[pkg_name]['item_sort_id'], 0) # Second number is sort, third number may also be sort?
         else: #Defaults to Cold Steel IV
-            item_tbl_entry += struct.pack("<3H", 48, 0, self.packages[pkg_name]['item_type'])
+            item_tbl_entry += struct.pack("<2H", 0, self.packages[pkg_name]['item_type'])
             item_tbl_entry += struct.pack("<4H", *[0]*4)
             item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
             item_tbl_entry += struct.pack("<B65H", *[0]*66)
