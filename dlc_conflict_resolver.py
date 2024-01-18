@@ -5,6 +5,20 @@
 
 import struct, os, glob, sys, shutil
 
+try:
+    import blowfish
+    key = b'ed8psv5_steam'
+    cipher = blowfish.Cipher(key)
+except:
+    pass
+
+# This script skips encrypted tables by default, change to True to attempt decrypting tables.
+attempt_cle_decrypt = False
+
+# Thank you to authors of Kuro Tools for the original decrypt function and to wheat32 for the key
+# https://github.com/nnguyen259/KuroTools
+# https://github.com/wheat32/HajimariQuickTranslation
+
 def read_null_terminated_string(f):
     null_term_string = f.read(1)
     while null_term_string[-1] != 0:
@@ -72,6 +86,24 @@ def valid_tbl (table_filename):
             if section_data[section_name] != section_count[section_name]:
                 return False
     return True
+
+def decrypt_haji_cle_file (table_filename):
+    with open(table_filename, 'rb') as f:
+        magic, size = struct.unpack('<2I', f.read(8))
+        if (magic == 0x40104241):
+            data = b"".join(cipher.decrypt_ecb(f.read((size//8)*8)))
+        else:
+            return False
+    # Validate before writing!  This script assumes that all encrypted tables are valid.
+    with open(table_filename+'.tmp', 'wb') as f:
+        f.write(data)
+    if valid_tbl(table_filename+'.tmp'):
+        os.rename(table_filename, table_filename+'.original_encrypted')
+        os.rename(table_filename+'.tmp', table_filename)
+        return True
+    else:
+        os.remove(table_filename+'.tmp')
+        return True
 
 # Returns length (true block size)
 def read_table_section (f, entry_type, game_type = 0):
@@ -254,11 +286,26 @@ def replace_dlc_id(dlc_folder_id, old_id, new_id):
     return
 
 def resolve_dlc(allow_low_numbers = False):
+    global attempt_cle_decrypt
     game_type = detect_ed8_game()
-    if os.path.exists('data/text/'):
-        item_tables = glob.glob('data/text/**/t_item_en.tbl', recursive = True)
+    text_folders = [x.replace('\\','/').split('/')[-1] for x in glob.glob('data/text*')]
+    if len(text_folders) > 0:
+        if len(text_folders) > 1:
+            print("Multiple text folders found!  Process which set?")
+            for i in range(len(text_folders)):
+                print("{0}. {1}".format(i+1, text_folders[i]))
+            i = -1
+            while not i in range(len(text_folders)):
+                try:
+                    i = int(input("Please select a folder set: "))-1
+                except:
+                    pass
+            text_folder = text_folders[i]
+        else:
+            text_folder = text_folders[0]
+        item_tables = glob.glob('data/{}/**/t_item_en.tbl'.format(text_folder), recursive = True)
         if len(item_tables) < 1:
-            item_tables = glob.glob('data/text/**/t_item.tbl', recursive = True)
+            item_tables = glob.glob('data/{}/**/t_item.tbl'.format(text_folder), recursive = True)
             if len(item_tables) < 1:
                 input("No master item table found, is this script in the root game folder?")
             else:
@@ -266,14 +313,32 @@ def resolve_dlc(allow_low_numbers = False):
         else:
             item_tables = [item_tables[0]]
         #In reading DLC tables, default to English, otherwise the first option available (usually dat)
-        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob('data/dlc/text/*')[0]+'/*')]
-        if 'dat_en' in dats:
-            dat_name = 'dat_en'
+        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob('data/dlc/{}/*'.format(text_folder))[0]+'/*')]
+        if len(dats) > 1:
+            print("Multiple dat language folders found!  Process which set?")
+            for i in range(len(dats)):
+                print("{0}. {1}".format(i+1, dats[i]))
+            i = -1
+            while not i in range(len(dats)):
+                try:
+                    i = int(input("Please select a folder set: "))-1
+                except:
+                    pass
+            dat_name = dats[i]
         else:
             dat_name = dats[0]
-        item_tables.extend(sorted(glob.glob('data/dlc/**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
-        dlc_tables = [x.replace('\\','/') for x in glob.glob('data/dlc/text/*/{}/t_dlc.tbl'.format(dat_name))]
-        dlc_folder_numbers = [int(x.split('text/')[1].split('/dat')[0]) for x in dlc_tables]
+        item_tables.extend(sorted(glob.glob('data/dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True)))
+        dlc_tables = [x.replace('\\','/') for x in glob.glob('data/dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
+        dlc_folder_numbers = [int(x.split(text_folder+'/')[1].split('/dat')[0]) for x in dlc_tables]
+        encrypted_tables = [x for x in item_tables+dlc_tables if is_cle_encrypted(x)]
+        if len(encrypted_tables) > 0 and attempt_cle_decrypt == True:
+            if "blowfish" in sys.modules:
+                for i in range(len(encrypted_tables)):
+                    success = decrypt_haji_cle_file(encrypted_tables[i])
+                    if not success:
+                        print("Did not successfully decrypt {}, will skip.".format(encrypted_tables[i]))
+            else:
+                print("Encrypted tables found, but Blowfish module is not installed, will skip encrypted tables.")
         item_tables = [x for x in item_tables if not is_cle_encrypted(x)]
         dlc_tables = [x for x in dlc_tables if not is_cle_encrypted(x)]
     else:
