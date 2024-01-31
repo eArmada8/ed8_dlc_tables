@@ -73,7 +73,7 @@ class dlc_table_maker:
 
     def get_chr_id (self, pkg_name):
         try:
-            base_name = "_".join(pkg_name.split("_")[0:2])
+            base_name = "_".join(pkg_name.split('.')[0].split("_")[0:2])
             if base_name[:2] == 'FC':
                 base_name = base_name[1:]
             return(self.name_dict[base_name]['chr_id'])
@@ -87,7 +87,7 @@ class dlc_table_maker:
             return ''
 
     def get_pkg_details (self):
-        packages = list(set([x.split('.json')[0] for x in glob.glob('*.pkg*')]))
+        packages = sorted(list(set([x.split('.json')[0] for x in glob.glob('*.pkg*')])))
         unique_chars = list(set([self.get_chr_id(x) for x in packages if self.get_chr_id(x) != 0x1FFFFFFF]))
         existing_items = self.get_items_from_jsons()
         pkg_dict = {}
