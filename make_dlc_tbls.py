@@ -206,7 +206,9 @@ class dlc_table_maker:
                     except ValueError:
                         print("Invalid entry!")
             while 'flags' not in pkg_details.keys():
-                if pkg_details['chr_id'] != 0xFFFF and pkg_details['item_quantity'] < 99:
+                if pkg_details['item_type'] == 454:
+                    pkg_details['flags'] = 'S1'
+                elif pkg_details['chr_id'] != 0xFFFF and pkg_details['item_quantity'] < 99:
                     pkg_details['flags'] = 'S{}'.format(pkg_details['item_quantity'])
                 else:
                     pkg_details['flags'] = '0'
