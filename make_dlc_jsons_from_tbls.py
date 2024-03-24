@@ -59,31 +59,33 @@ def read_dlc_table(dlc_table, game_type = 4):
 def read_attach_table(attach_table, game_type = 4):
     attachdata = []
     with open(attach_table, 'rb') as f:
+        f.seek(0,2)
+        f_len = f.tell()
+        f.seek(0,0)
         total_entries, num_sections = struct.unpack("<hi",f.read(6))
         section_data = []
         for i in range(num_sections):
             section = {'name': read_null_terminated_string(f),\
                 'num_items': struct.unpack("<i", f.read(4))[0]}
             section_data.append(section)
-        for i in range(len(section_data)):
-            for j in range(section_data[i]['num_items']):
-                entry_type = read_null_terminated_string(f)
-                block_size, = struct.unpack("<h", f.read(2))
-                if section_data[i]['name'] == 'AttachTableData':
-                    attach = {}
-                    attach['char_id'], attach['item_type'], unk0, attach['item_id'] = struct.unpack("<4h", f.read(8))
-                    if game_type == 3:
-                        f.seek(14,1)
-                    else:
-                        f.seek(8,1)
-                        attach['rev_voice_flag'], attach['item_cs4rev_scraft_cutin'] = struct.unpack("<2i", f.read(8))
-                        f.seek(2,1)
-                        pkg_name = read_null_terminated_string(f)
-                    attach['model'] = read_null_terminated_string(f)
-                    attach['attach_point'] = read_null_terminated_string(f)
-                    attachdata.append(attach)
+        while f.tell() < f_len:
+            entry_type = read_null_terminated_string(f)
+            block_size, = struct.unpack("<h", f.read(2))
+            if entry_type == 'AttachTableData':
+                attach = {}
+                attach['char_id'], attach['item_type'], unk0, attach['item_id'] = struct.unpack("<4h", f.read(8))
+                if game_type == 3:
+                    f.seek(14,1)
                 else:
-                    f.seek(block_size,1)
+                    f.seek(8,1)
+                    attach['rev_voice_flag'], attach['item_cs4rev_scraft_cutin'] = struct.unpack("<2i", f.read(8))
+                    f.seek(2,1)
+                    pkg_name = read_null_terminated_string(f)
+                attach['model'] = read_null_terminated_string(f)
+                attach['attach_point'] = read_null_terminated_string(f)
+                attachdata.append(attach)
+            else:
+                f.seek(block_size,1)
     return(attachdata)
 
 # Currently only supports item, not item_q or item_e
