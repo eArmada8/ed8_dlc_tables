@@ -277,12 +277,16 @@ def replace_item_id(dlc_id, old_id, new_id, game_type = 0):
     if game_type in [3,4,5]:
         folder_prefix = 'data/'
     item_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)
+    attach_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)
+    dlc_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)
+    if os.path.exists('dev/'):
+        item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
+        attach_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in attach_tables]
+        dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
     for i in range(len(item_tables)):
         replace_item_id_in_t_item(item_tables[i], old_id, new_id)
-    attach_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)
     for i in range(len(attach_tables)):
         replace_item_id_in_t_attach(attach_tables[i], old_id, new_id)
-    dlc_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)
     for i in range(len(dlc_tables)):
         replace_item_id_in_t_dlc(dlc_tables[i], old_id, new_id, game_type)
     return
@@ -292,6 +296,8 @@ def replace_dlc_id(dlc_folder_id, old_id, new_id, game_type = 0):
     if game_type in [3,4,5]:
         folder_prefix = 'data/'
     dlc_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)
+    if os.path.exists('dev/'):
+        dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
     for i in range(len(dlc_tables)):
         replace_item_id_in_t_item(dlc_tables[i], old_id, new_id)
     return
@@ -343,6 +349,9 @@ def resolve_dlc(allow_low_numbers = False):
             dat_name = dats[0]
         item_tables.extend(sorted(glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True)))
         dlc_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
+        if os.path.exists('dev/'):
+            item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
+            dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
         dlc_folder_numbers = [int(x.split(text_folder+'/')[1].split('/dat')[0]) for x in dlc_tables]
         encrypted_tables = [x for x in item_tables+dlc_tables if is_cle_encrypted(x)]
         if len(encrypted_tables) > 0 and attempt_cle_decrypt == True:

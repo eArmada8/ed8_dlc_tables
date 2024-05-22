@@ -38,16 +38,18 @@ def read_id_numbers(table):
 
 def get_all_id_numbers():
     if os.path.exists('data/dlc/'):
-        item_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True)
+        dlc_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True)
     elif os.path.exists('dlc/'): # Tokyo Xanadu eX+ mode
-        item_tables = []
+        dlc_tables = []
         if os.path.exists('text/'):
-            item_tables.extend(glob.glob('text/**/t_dlc.tbl', recursive = True))
-        item_tables.extend(glob.glob('dlc/**/t_dlc.tbl', recursive = True))
+            dlc_tables.extend(glob.glob('text/**/t_dlc.tbl', recursive = True))
+        dlc_tables.extend(glob.glob('dlc/**/t_dlc.tbl', recursive = True))
+    if os.path.exists('dev/'):
+        dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
     all_item_numbers = []
-    for i in range(len(item_tables)):
-        print("Checking {0}...".format(item_tables[i]))
-        all_item_numbers.extend(read_id_numbers(item_tables[i]))
+    for i in range(len(dlc_tables)):
+        print("Checking {0}...".format(dlc_tables[i]))
+        all_item_numbers.extend(read_id_numbers(dlc_tables[i]))
     return(sorted(list(set(all_item_numbers))))
 
 def check_id_number(all_item_numbers, number = -1):

@@ -69,6 +69,8 @@ def get_all_id_numbers():
             item_tables.extend(sorted(glob.glob('dlc/**/dat/t_item.tbl', recursive = True)))
     else:
         input("No master item table found, is this script in the root game folder?")
+    if os.path.exists('dev/'):
+        item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
     all_item_numbers = {}
     all_dlc_item_numbers = {}
     for i in range(len(item_tables)):
