@@ -1,7 +1,7 @@
 # Short script to extract data from a set of dlc tables made by make_dlc_tbls.py for
 # Trails of Cold Steel III / IV / into Reverie and output them as JSON files.
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/ed8_dlc_tables
 
 import struct, json, os
 
@@ -13,14 +13,14 @@ def read_null_terminated_string(f):
 
 def input_gametype():
     game_type = 0
-    while game_type not in [3,4,5]:
-        game_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, leave blank for 4] ")
+    while game_type not in [3,4,5,18]:
+        game_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
         if game_type_raw == '':
             game_type = 4
         else:
             try:
                 game_type = int(game_type_raw)
-                if game_type not in [3,4,5]:
+                if game_type not in [3,4,5,18]:
                     print("Invalid entry!")
             except ValueError:
                 print("Invalid entry!")
@@ -41,9 +41,13 @@ def read_dlc_table(dlc_table, game_type = 4):
                 block_size, = struct.unpack("<h", f.read(2))
                 if section_data[i]['name'] == 'dlc':
                     dlc = {}
-                    dlc['dlc_id'], dlc['dlc_sort_id'] = struct.unpack("<2h", f.read(4))
+                    dlc['dlc_id'], = struct.unpack("<h", f.read(2))
+                    if game_type in [3,4,5]:
+                        dlc['dlc_sort_id'], = struct.unpack("<h", f.read(2))
                     if game_type == 3:
                         f.seek(4,1)
+                    elif game_type == 18:
+                        f.seek(8,1)
                     else:
                         f.seek(16,1)
                     dlc['dlc_name'] = read_null_terminated_string(f)
@@ -76,6 +80,8 @@ def read_attach_table(attach_table, game_type = 4):
                 attach['char_id'], attach['item_type'], unk0, attach['item_id'] = struct.unpack("<4h", f.read(8))
                 if game_type == 3:
                     f.seek(14,1)
+                elif game_type == 18:
+                    f.seek(18,1)
                 else:
                     f.seek(8,1)
                     attach['rev_voice_flag'], attach['item_cs4rev_scraft_cutin'] = struct.unpack("<2i", f.read(8))
@@ -129,10 +135,17 @@ def read_item_table(item_table, game_type = 4):
                         f.seek(112,1)
                         item['item_sort_id'], = struct.unpack("<H", f.read(2))
                         f.seek(2,1)
+                    elif game_type == 18:
+                        item['item_type'], = struct.unpack("<H", f.read(2))
+                        f.seek(56,1)
+                        item['item_sort_id'], = struct.unpack("<H", f.read(2))
+                        f.seek(2,1)
                     item['item_name'] = read_null_terminated_string(f)
                     item['item_desc'] = read_null_terminated_string(f)
                     if game_type in [3,4]:
                         f.seek(8,1)
+                    elif game_type == 18:
+                        f.seek(9,1)
                     items.append(item)
                 else:
                     f.seek(block_size,1)
@@ -148,7 +161,8 @@ def write_struct_to_json(struct, filename):
 def write_dlc_json(dlcs, game_type):
     for i in range(len(dlcs)):
         write_struct_to_json({'game_type': game_type,\
-            'dlc_id': dlcs[i]['dlc_id'], 'dlc_sort_id': dlcs[i]['dlc_sort_id'],\
+            'dlc_id': dlcs[i]['dlc_id'],\
+            'dlc_sort_id': dlcs[i]['dlc_sort_id'] if 'dlc_sort_id' in dlcs[i] else 0,\
             'dlc_name': dlcs[i]['dlc_name'], 'dlc_desc': dlcs[i]['dlc_desc']},\
             'dlc{}'.format(str(i) if i > 0 else ''))
     return
@@ -165,7 +179,8 @@ def write_pkg_jsons(attaches, items, dlcs):
                 item_quantity = sum([x[1] for x in matching_dlcs[0]['items'] if x[0] == item['item_id']])
                 write_struct_to_json({'item_id': item['item_id'],\
                     'item_type': item['item_type'], 'item_name': item['item_name'], 'item_desc': item['item_desc'],\
-                    'flags': item['flags'], 'target_type': item['target_type'], 'attach_point': attach['attach_point'],\
+                    'flags': item['flags'], 'target_type': item['target_type'] if 'target_type' in item else 0,\
+                    'attach_point': attach['attach_point'],\
                     'chr_id': item['chr_id'], 'chr_id_a': attach['char_id'], 'item_sort_id': item['item_sort_id'],\
                     'item_cs4rev_scraft_cutin': (item['item_cs4rev_scraft_cutin'] if 'item_cs4rev_scraft_cutin' in item else 0),\
                     'rev_voice_flag': (item['rev_voice_flag'] if 'rev_voice_flag' in item else 0),\

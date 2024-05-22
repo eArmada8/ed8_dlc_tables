@@ -1,7 +1,14 @@
-# Script to check if an ID number is in use for Trails of Cold Steel 3, 4, Reverie.
+# Script to check if an ID number is in use for Trails of Cold Steel 3, 4, Reverie and Tokyo Xanadu eX+.
+#
 # Usage: Place in the root directory of the game (same folder that bin and data folders are in)
 #        and run.
-# GitHub eArmada8/misc_kiseki
+#
+# Note:  For TXe, all the t_item.tbl files must be extracted first.  Use txe_file_extract.py from
+#        https://github.com/eArmada8/ed8_inject/releases and run the following command:
+#            python txe_file_extract.py -a System.bra t_dlc
+#        prior to using this script.
+#
+# GitHub eArmada8/ed8_dlc_tables
 
 import struct, os, glob, sys
 
@@ -30,8 +37,13 @@ def read_id_numbers(table):
     return(item_numbers)
 
 def get_all_id_numbers():
-    if os.path.exists('data/text/'):
+    if os.path.exists('data/dlc/'):
         item_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True)
+    elif os.path.exists('dlc/'): # Tokyo Xanadu eX+ mode
+        item_tables = []
+        if os.path.exists('text/'):
+            item_tables.extend(glob.glob('text/**/t_dlc.tbl', recursive = True))
+        item_tables.extend(glob.glob('dlc/**/t_dlc.tbl', recursive = True))
     all_item_numbers = []
     for i in range(len(item_tables)):
         print("Checking {0}...".format(item_tables[i]))

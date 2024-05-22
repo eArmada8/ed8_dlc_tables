@@ -1,7 +1,7 @@
 # A script to find and resolve DLC item ID conflicts for Trails of Cold Steel III, IV and into Reverie (NISA).
 # Place in the base directory of the game (the folder with both bin and data folders within it) and run.
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/ed8_dlc_tables
 
 import struct, os, glob, sys, shutil
 
@@ -25,11 +25,13 @@ def read_null_terminated_string(f):
         null_term_string += f.read(1)
     return(null_term_string[:-1].decode('utf-8'))
 
-# Should be the table with Tear Balm
 def detect_ed8_game():
     game_type = 0
     if os.path.exists('bin/'):
         game_exes = [x.replace('\\','/').split('/')[-1] for x in glob.glob('bin/**/*.exe', recursive = True)]
+    elif os.path.exists('TokyoXanadu.exe'):
+        game_type = 18
+        return(game_type)
     else:
         return(-1) # Not in a ed8 root directory
     if 'ed8_3' in [x[0:5] for x in game_exes]:
@@ -38,13 +40,13 @@ def detect_ed8_game():
         game_type = 4
     elif 'ed8_ps5' in [x[0:7] for x in game_exes] or 'hnk.exe' in game_exes:
         game_type = 5
-    if game_type not in [3,4,5]:
-        game_input_raw = input("Game type detection failed (likely non-NISA CS3/CS4/Reverie).  Try with manual type?  Input 3, 4 or 5.  ")
+    if game_type not in [3,4,5,18]:
+        game_input_raw = input("Game type detection failed (likely non-NISA CS3/CS4/Reverie or Aksys TXe).  Try with manual type?  Input 3, 4, 5, 18 (TXe).  ")
         try:
             game_input = int(game_input_raw)
-            if game_input in [3,4,5]:
+            if game_input in [3,4,5,18]:
                 game_type = game_input
-                print("\nAttempting to parse using {0} table format.".format({3:'CS3', 4:'CS4', 5:'Reverie'}[game_type]))
+                print("\nAttempting to parse using {0} table format.".format({3:'CS3', 4:'CS4', 5:'Reverie', 18:'TXe'}[game_type]))
                 print("If the item names are not correct, do not attempt to use!\n")
         except ValueError:
             pass
@@ -110,7 +112,8 @@ def read_table_section (f, entry_type, game_type = 0):
     # 0 is null-terminated string
     schema = {3: {'item': [4, 0, 127, 0, 0, 8], 'item_q': [4, 0, 127, 0, 0, 20], 'dlc': [8, 0, 0, 80]}, \
         4: {'item': [4, 0, 150, 0, 0, 8], 'item_q': [4, 0, 150, 0, 0, 20], 'dlc':  [20, 0, 0, 80]}, \
-        5: {'item': [4, 0, 141, 0, 0], 'item_e': [4, 0, 141, 0, 0, 10], 'item_q': [4, 0, 141, 0, 0, 22], 'dlc': [20, 0, 0, 80]}}
+        5: {'item': [4, 0, 141, 0, 0], 'item_e': [4, 0, 141, 0, 0, 10], 'item_q': [4, 0, 141, 0, 0, 22], 'dlc': [20, 0, 0, 80]},\
+        18: {'item': [4, 0, 62, 0, 0, 9], 'item_q': [4, 0, 62, 0, 0, 9], 'dlc': [10, 0, 0, 80]}}
     list_to_read = schema[game_type][entry_type]
     start = f.tell()
     for i in range(len(list_to_read)):
@@ -181,11 +184,11 @@ def get_all_id_numbers(item_tables):
     return(all_item_numbers)
 
 def get_item_name_by_item_entry(item_entry, game_type = 0):
-    if game_type in [3,4,5]:
+    if game_type in [3,4,5,18]:
         with open(item_entry['table'], 'rb') as f:
             f.seek(item_entry['offset'] + 6,0)
             read_null_terminated_string(f) #Flags
-            f.seek({3:0x7f, 4:0x96, 5:0x8d}[game_type],1)
+            f.seek({3:0x7f, 4:0x96, 5:0x8d, 18:0x3e}[game_type],1)
             item_name = read_null_terminated_string(f)
         return(item_name)
     else:
@@ -195,7 +198,7 @@ def get_dlc_name_by_dlc_entry(dlc_entry, game_type = 0):
     if game_type in [3,4,5]:
         with open(dlc_entry['table'], 'rb') as f:
             f.seek(dlc_entry['offset'],0)
-            f.seek({3:10, 4:22, 5:22}[game_type],1)
+            f.seek({3:10, 4:22, 5:22, 18:12}[game_type],1)
             item_name = read_null_terminated_string(f)
         return(item_name)
     else:
@@ -254,8 +257,10 @@ def replace_item_id_in_t_dlc (table, old_id, new_id, game_type = 0):
                     offset = f.tell()
                     block_size, dlc_id = struct.unpack("<2h", f.read(4))
                     f.seek(6,1)
-                    if game_type > 3:
+                    if game_type in [4,5]:
                         f.seek(12,1)
+                    elif game_type == 18:
+                        f.seek(2,1)
                     name = read_null_terminated_string(f)
                     desc = read_null_terminated_string(f)
                     item_struct_offset = f.tell()
@@ -268,19 +273,25 @@ def replace_item_id_in_t_dlc (table, old_id, new_id, game_type = 0):
     return
 
 def replace_item_id(dlc_id, old_id, new_id, game_type = 0):
-    item_tables = glob.glob('data/dlc/text/{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)
+    folder_prefix = ''
+    if game_type in [3,4,5]:
+        folder_prefix = 'data/'
+    item_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)
     for i in range(len(item_tables)):
         replace_item_id_in_t_item(item_tables[i], old_id, new_id)
-    attach_tables = glob.glob('data/dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)
+    attach_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)
     for i in range(len(attach_tables)):
         replace_item_id_in_t_attach(attach_tables[i], old_id, new_id)
-    dlc_tables = glob.glob('data/dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)
+    dlc_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)
     for i in range(len(dlc_tables)):
         replace_item_id_in_t_dlc(dlc_tables[i], old_id, new_id, game_type)
     return
 
-def replace_dlc_id(dlc_folder_id, old_id, new_id):
-    dlc_tables = glob.glob('data/dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)
+def replace_dlc_id(dlc_folder_id, old_id, new_id, game_type = 0):
+    folder_prefix = ''
+    if game_type in [3,4,5]:
+        folder_prefix = 'data/'
+    dlc_tables = glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)
     for i in range(len(dlc_tables)):
         replace_item_id_in_t_item(dlc_tables[i], old_id, new_id)
     return
@@ -288,7 +299,10 @@ def replace_dlc_id(dlc_folder_id, old_id, new_id):
 def resolve_dlc(allow_low_numbers = False):
     global attempt_cle_decrypt
     game_type = detect_ed8_game()
-    text_folders = [x.replace('\\','/').split('/')[-1] for x in glob.glob('data/text*')]
+    folder_prefix = ''
+    if game_type in [3,4,5]:
+        folder_prefix = 'data/'
+    text_folders = [x.replace('\\','/').split('/')[-1] for x in glob.glob(folder_prefix+'text*')]
     if len(text_folders) > 0:
         if len(text_folders) > 1:
             print("Multiple text folders found!  Process which set?")
@@ -303,9 +317,9 @@ def resolve_dlc(allow_low_numbers = False):
             text_folder = text_folders[i]
         else:
             text_folder = text_folders[0]
-        item_tables = glob.glob('data/{}/**/t_item_en.tbl'.format(text_folder), recursive = True)
+        item_tables = glob.glob(folder_prefix+'{}/**/t_item_en.tbl'.format(text_folder), recursive = True)
         if len(item_tables) < 1:
-            item_tables = glob.glob('data/{}/**/t_item.tbl'.format(text_folder), recursive = True)
+            item_tables = glob.glob(folder_prefix+'{}/**/t_item.tbl'.format(text_folder), recursive = True)
             if len(item_tables) < 1:
                 input("No master item table found, is this script in the root game folder?")
             else:
@@ -313,7 +327,7 @@ def resolve_dlc(allow_low_numbers = False):
         else:
             item_tables = [item_tables[0]]
         #In reading DLC tables, default to English, otherwise the first option available (usually dat)
-        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob('data/dlc/{}/*'.format(text_folder))[0]+'/*')]
+        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'dlc/{}/*'.format(text_folder))[0]+'/*')]
         if len(dats) > 1:
             print("Multiple dat language folders found!  Process which set?")
             for i in range(len(dats)):
@@ -327,8 +341,8 @@ def resolve_dlc(allow_low_numbers = False):
             dat_name = dats[i]
         else:
             dat_name = dats[0]
-        item_tables.extend(sorted(glob.glob('data/dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True)))
-        dlc_tables = [x.replace('\\','/') for x in glob.glob('data/dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
+        item_tables.extend(sorted(glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True)))
+        dlc_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
         dlc_folder_numbers = [int(x.split(text_folder+'/')[1].split('/dat')[0]) for x in dlc_tables]
         encrypted_tables = [x for x in item_tables+dlc_tables if is_cle_encrypted(x)]
         if len(encrypted_tables) > 0 and attempt_cle_decrypt == True:
@@ -370,12 +384,12 @@ def resolve_dlc(allow_low_numbers = False):
                         next_available = [x for x in range(min(dlc_ids), max(all_utilized_item_ids)) if x not in all_utilized_item_ids][0]
                     print("Item ID {0} is available, assign {0} to which item? (Do not pick official Falcom items!)".format(next_available))
                     print("1. {0} (Table {1})".format(get_item_name_by_item_entry(current_table_items[conflicts[j]], game_type), \
-                        int(item_tables[i].replace('\\','/').split('/')[3])))
+                        int(item_tables[i].replace('\\','/').split('/')[-3])))
                     allowed_changes = [0,1]
                     # Check if conflict is in DLC table; if yes then either table can be changed, if no then only the current table can be changed.
                     if len(all_prior_entries[conflicts[j]].replace('\\','/').split('/')) > 4:
                         print("2. {0} (Table {1})".format(get_item_name_by_item_entry(read_id_numbers_with_offsets(all_prior_entries[conflicts[j]])[conflicts[j]], game_type),\
-                            int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3])))
+                            int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[-3])))
                         allowed_changes.append(2)
                     print("0. Skip")
                     table_to_fix = -1
@@ -389,11 +403,11 @@ def resolve_dlc(allow_low_numbers = False):
                             print("Invalid entry!")
                     if table_to_fix == 1:
                         print("Replacing item ID {0} with {1} in DLC {2}.\n".format(conflicts[j], next_available, item_tables[i].replace('\\','/').split('/')[3]))
-                        replace_item_id(int(item_tables[i].replace('\\','/').split('/')[3]), conflicts[j], next_available, game_type)
+                        replace_item_id(int(item_tables[i].replace('\\','/').split('/')[-3]), conflicts[j], next_available, game_type)
                         all_utilized_item_ids.append(next_available)
                     elif table_to_fix == 2:
                         print("Replacing item ID {0} with {1} in DLC {2}.\n".format(conflicts[j], next_available, all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3]))
-                        replace_item_id(int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3]), conflicts[j], next_available, game_type)
+                        replace_item_id(int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[-3]), conflicts[j], next_available, game_type)
                         all_utilized_item_ids.append(next_available)
                     else:
                         print("Skipping item ID {0}.".format(conflicts[j]))
@@ -420,13 +434,13 @@ def resolve_dlc(allow_low_numbers = False):
                 print("DLC ID {0} is available, assign {0} to which DLC? (Do not pick official Falcom items!)".format(next_available))
                 allowed_changes = [0]
                 print("Only allowed changes will be displayed.  In some cases, this may mean no changes are allowed.")
-                if conflicts[j] != int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3]):
+                if conflicts[j] != int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[-3]):
                     print("1. {0} (Table {1})".format(get_dlc_name_by_dlc_entry(read_id_numbers_with_offsets(all_prior_entries[conflicts[j]])[conflicts[j]], game_type),\
-                        int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3])))
+                        int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[-3])))
                     allowed_changes.append(1)
-                if conflicts[j] != int(dlc_tables[i].replace('\\','/').split('/')[3]):
+                if conflicts[j] != int(dlc_tables[i].replace('\\','/').split('/')[-3]):
                     print("2. {0} (Table {1})".format(get_dlc_name_by_dlc_entry(current_table_dlcs[conflicts[j]], game_type), \
-                    int(dlc_tables[i].replace('\\','/').split('/')[3])))
+                    int(dlc_tables[i].replace('\\','/').split('/')[-3])))
                     allowed_changes.append(2)
                 print("0. Skip")
                 table_to_fix = -1
@@ -440,11 +454,11 @@ def resolve_dlc(allow_low_numbers = False):
                         print("Invalid entry!")
                 if table_to_fix == 1:
                     print("Replacing DLC ID {0} with {1} in DLC {2}.\n".format(conflicts[j], next_available, all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3]))
-                    replace_dlc_id(int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[3]), conflicts[j], next_available)
+                    replace_dlc_id(int(all_prior_entries[conflicts[j]].replace('\\','/').split('/')[-3]), conflicts[j], next_available, game_type)
                     all_utilized_dlc_ids.append(next_available)
                 elif table_to_fix == 2:
                     print("Replacing DLC ID {0} with {1} in DLC {2}.\n".format(conflicts[j], next_available, dlc_tables[i].replace('\\','/').split('/')[3]))
-                    replace_dlc_id(int(dlc_tables[i].replace('\\','/').split('/')[3]), conflicts[j], next_available)
+                    replace_dlc_id(int(dlc_tables[i].replace('\\','/').split('/')[-3]), conflicts[j], next_available, game_type)
                     all_utilized_dlc_ids.append(next_available)
                 else:
                     print("Skipping item ID {0}.".format(conflicts[j]))

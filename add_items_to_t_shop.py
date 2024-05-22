@@ -2,7 +2,7 @@
 # as t_shop.tbl.original, and put .json files (from make_dlc_tbls.py) in folders named by shop_id (for example, in a folder
 # named 1041 for the reverie corridor costume shop, which is shop_id 1041).
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/ed8_dlc_tables
 
 import json, glob, os, sys, struct
 
@@ -14,6 +14,7 @@ def read_null_terminated_string(f):
 
 def read_id_numbers_with_offsets(table):
     table_data = []
+    game_type = 3 # CS3, CS4 and CS5 all have the same ShopItem so will all be 3
     with open(table, 'rb') as f:
         f.seek(0,2)
         file_end = f.tell()
@@ -30,7 +31,9 @@ def read_id_numbers_with_offsets(table):
             block_size, = struct.unpack("<h", f.read(2))
             block_data = f.read(block_size)
             table_data.append({'type': entry_type, 'data': block_data})
-    return(table_data, section_data)
+            if entry_type == 'ShopItem' and block_size == 10:
+                game_type = 18
+    return(table_data, section_data, game_type)
 
 def read_shop_id_numbers (table_data):
     return([struct.unpack('<H',x['data'][0:2])[0] if x['type'] == 'ShopItem' else -1 for x in table_data])
@@ -46,12 +49,15 @@ def read_items():
     new_items_json_list = glob.glob('**/*.json',recursive=True)
     return([{'shop_id': int(x.replace('\\','/').split('/')[0]), 'item_id': read_json_for_item_id(x)} for x in new_items_json_list])
 
-def build_shop_item(shop_id, item_id):
-    entry = struct.pack('<4H', shop_id, item_id, 0, 0)
-    entry += struct.pack('<B4H', 0, 0, 0, 65535, 0)
+def build_shop_item(shop_id, item_id, game_type = 4):
+    if game_type in [3,4,5]:
+        entry = struct.pack('<4H', shop_id, item_id, 0, 0)
+        entry += struct.pack('<B4H', 0, 0, 0, 65535, 0)
+    else: #TXe
+        entry = struct.pack('<5H', shop_id, item_id, 0, 0, 0)
     return({'type':'ShopItem','data':entry})
 
-def add_items_to_table(table_data, new_items):
+def add_items_to_table(table_data, new_items, game_type = 4):
     new_item_dict = {x:[y for y in new_items if y['shop_id'] == x] for x in list(set([z['shop_id'] for z in new_items]))}
     for shop_id in new_item_dict:
         # Parsing the table every time is admittedly not efficient, but once per shop isn't bad
@@ -63,7 +69,7 @@ def add_items_to_table(table_data, new_items):
             #Append to the end of the list
             insertion = len(shop_id_column)
         for i in range(len(new_item_dict[shop_id])):
-            table_data.insert(insertion+i, build_shop_item(new_item_dict[shop_id][i]['shop_id'], new_item_dict[shop_id][i]['item_id']))
+            table_data.insert(insertion+i, build_shop_item(new_item_dict[shop_id][i]['shop_id'], new_item_dict[shop_id][i]['item_id'], game_type))
     return(table_data)
 
 def generate_table(table_data, section_data):
@@ -80,10 +86,10 @@ def generate_table(table_data, section_data):
         table_header_data += k.encode() + b'\x00' + struct.pack('<i', section_counts[k])
     return(struct.pack('<hi', len(table_data), len(section_counts)) + table_header_data + table_block_data)
 
-def process_tbl (table = 't_shop.tbl'):
+def process_tbl (table = 't_shop.tbl', game_type = 4):
     original_table = table + '.original'
-    table_data, section_data = read_id_numbers_with_offsets(original_table)
-    table_data = add_items_to_table(table_data, read_items())
+    table_data, section_data, game_type = read_id_numbers_with_offsets(original_table)
+    table_data = add_items_to_table(table_data, read_items(), game_type)
     with open(table, 'wb') as f:
         f.write(generate_table(table_data, section_data))
 

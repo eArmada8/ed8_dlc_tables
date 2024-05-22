@@ -1,7 +1,14 @@
-# Script to check if an ID number is in use for Trails of Cold Steel 3, 4, Reverie.
+# Script to check if an ID number is in use for Trails of Cold Steel 3, 4, Reverie and Tokyo Xanadu eX+.
+#
 # Usage: Place in the root directory of the game (same folder that bin and data folders are in)
 #        and run.
-# GitHub eArmada8/misc_kiseki
+#
+# Note:  For TXe, all the t_item.tbl files must be extracted first.  Use txe_file_extract.py from
+#        https://github.com/eArmada8/ed8_inject/releases and run the following command:
+#            python txe_file_extract.py -a System.bra t_item
+#        prior to using this script.
+#
+# GitHub eArmada8/ed8_dlc_tables
 
 import struct, os, glob, sys
 
@@ -47,6 +54,19 @@ def get_all_id_numbers():
         else:
             dat_name = dat[0]
         item_tables.extend(sorted(glob.glob('data/dlc/**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
+    elif os.path.exists('text/'): #Tokyo Xanadu eX+ mode
+        item_tables = glob.glob('text/**/t_item_en.tbl', recursive = True)
+        if len(item_tables) < 1:
+            item_tables = glob.glob('text/**/t_item.tbl', recursive = True)
+            if len(item_tables) < 1:
+                input("No master item table found, is this script in the root game folder?")
+            else:
+                item_tables = [item_tables[0]]
+        else:
+            item_tables = [item_tables[0]]
+        #DLC tables exist in dlc/text/___/dat regardless of language; different .bra archives exist per language
+        if os.path.exists('dlc/'):
+            item_tables.extend(sorted(glob.glob('dlc/**/dat/t_item.tbl', recursive = True)))
     else:
         input("No master item table found, is this script in the root game folder?")
     all_item_numbers = {}

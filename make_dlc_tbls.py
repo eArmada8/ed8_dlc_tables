@@ -2,7 +2,7 @@
 # Trails of Cold Steel III / IV / into Reverie.  Uses the decoded t_name.tbl
 # from tbled.
 #
-# GitHub eArmada8/misc_kiseki
+# GitHub eArmada8/ed8_dlc_tables
 
 import os, csv, json, struct, glob, random
 
@@ -11,7 +11,8 @@ class dlc_table_maker:
         random.seed()
         self.random_number = round(random.random()*888+2000)
         self.dlc_details = self.get_dlc_details()
-        self.name_dict = self.get_names({3:'ed83nisa.csv', 4:'ed84nisa.csv', 5:'ed85nisa.csv'}[self.dlc_details['game_type']])
+        self.name_dict = self.get_names({3:'ed83nisa.csv', 4:'ed84nisa.csv', 5:'ed85nisa.csv', 18:'txe_names.csv'}\
+            [self.dlc_details['game_type']])
         self.packages = self.get_pkg_details()
         self.package_list = list(self.packages.keys())
 
@@ -21,14 +22,14 @@ class dlc_table_maker:
                 dlc_details = json.loads(f.read())
         else:
             dlc_details = {}
-        while 'game_type' not in dlc_details.keys() or dlc_details['game_type'] not in [3,4,5]:
-            item_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, leave blank for 4] ")
+        while 'game_type' not in dlc_details.keys() or dlc_details['game_type'] not in [3,4,5,18]:
+            item_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
             if item_type_raw == '':
                 dlc_details['game_type'] = 4
             else:
                 try:
                     dlc_details['game_type'] = int(item_type_raw)
-                    if dlc_details['game_type'] not in [3,4,5]:
+                    if dlc_details['game_type'] not in [3,4,5,18]:
                         print("Invalid entry!")
                 except ValueError:
                     print("Invalid entry!")
@@ -186,7 +187,7 @@ class dlc_table_maker:
                     except ValueError:
                         print("Invalid entry!")
             while 'item_sort_id' not in pkg_details.keys():
-                pkg_details['item_sort_id'] = self.random_number + {3:0, 4:3000, 5:10000}[self.dlc_details['game_type']]
+                pkg_details['item_sort_id'] = self.random_number + {3:0, 4:3000, 5:10000, 18: 2000}[self.dlc_details['game_type']]
                 self.random_number += 1
             while 'item_name' not in pkg_details.keys() or pkg_details['item_name'] == '':
                 pkg_details['item_name'] = str(input("Item Name for {0}: ".format(packages[i]))).encode('utf-8').decode('utf-8')
@@ -221,7 +222,7 @@ class dlc_table_maker:
 
     def make_tbl_header (self, item_count, name, second_name = ''):
         if len(second_name) > 0:
-            #CS3 requires both item and item_q in every item table for some reason, even if there is no item_q
+            #CS3/TXe requires both item and item_q in every item table for some reason, even if there is no item_q
             return(struct.pack("<HI", item_count, 2) + name.encode() + b'\x00' + struct.pack("<I", item_count)\
                  + second_name.encode() + b'\x00' + struct.pack("<I", 0)) #Second quantity set to 0
         else:
@@ -243,6 +244,10 @@ class dlc_table_maker:
             item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
             item_tbl_entry += struct.pack("<B55H", *[0]*56)
             item_tbl_entry += struct.pack("<BHH", 99, self.packages[pkg_name]['item_sort_id'], 0) # Second number is sort, third number may also be sort?
+        elif self.dlc_details['game_type'] == 18: #TXe
+            item_tbl_entry += struct.pack("<H", self.packages[pkg_name]['item_type'])
+            item_tbl_entry += struct.pack("<27H", *[0]*27)
+            item_tbl_entry += struct.pack("<3H", 99, self.packages[pkg_name]['item_sort_id'], self.dlc_details['dlc_id'])
         else: #Defaults to Cold Steel IV
             item_tbl_entry += struct.pack("<2H", 0, self.packages[pkg_name]['item_type'])
             item_tbl_entry += struct.pack("<4H", *[0]*4)
@@ -253,6 +258,8 @@ class dlc_table_maker:
         item_tbl_entry += self.packages[pkg_name]['item_desc'].encode('utf-8') + b'\x00'
         if self.dlc_details['game_type'] == 5: #NISA Reverie
             pass
+        elif self.dlc_details['game_type'] == 18: #TXe
+            item_tbl_entry += struct.pack("<2IB", *[0]*3)
         else: #Defaults to Cold Steel III/IV
             item_tbl_entry += struct.pack("<2I", 0, 0)
         return(b'item\x00' + struct.pack("<H",len(item_tbl_entry)) + item_tbl_entry)
@@ -262,6 +269,8 @@ class dlc_table_maker:
             {193:5, 194:67, 195: 9, 454: 5}[self.packages[pkg_name]['item_type']], 0, self.packages[pkg_name]['item_id'])
         if self.dlc_details['game_type'] == 3: #CS3
             attach_tbl_entry += struct.pack("<6H", *[0]*6)
+        elif self.dlc_details['game_type'] == 18: #TXe
+            attach_tbl_entry += struct.pack("<4I", 0,0,0,255)
         else: #Defaults to Cold Steel IV / Reverie
             voice_flag = self.packages[pkg_name]['rev_voice_flag'] if self.dlc_details['game_type'] == 5 else 0
             attach_tbl_entry += struct.pack("<4iH", 0, 0, voice_flag, self.packages[pkg_name]['item_cs4rev_scraft_cutin'], 48)
@@ -270,9 +279,15 @@ class dlc_table_maker:
         return(b'AttachTableData\x00' + struct.pack("<H",len(attach_tbl_entry)) + attach_tbl_entry)
 
     def make_dlc_entry (self):
-        dlc_tbl_entry = struct.pack("<2H", self.dlc_details['dlc_id'], self.dlc_details['dlc_sort_id'])
+        if self.dlc_details['game_type'] == 18: #TXe
+            dlc_tbl_entry = struct.pack("<H", self.dlc_details['dlc_id'])
+        else:
+            dlc_tbl_entry = struct.pack("<2H", self.dlc_details['dlc_id'], self.dlc_details['dlc_sort_id'])
         if self.dlc_details['game_type'] == 3: #CS3
             dlc_tbl_entry += struct.pack("<2H", *[0]*2)
+        elif self.dlc_details['game_type'] == 18: #TXe
+            # I have no idea if there is a sort ID here, every entry I examined had the same values
+            dlc_tbl_entry += struct.pack("<2HI", 65535, 100, 0)
         else: #Defaults to Cold Steel IV / Reverie
             dlc_tbl_entry += struct.pack("<8H", *[0]*8)
         dlc_tbl_entry += self.dlc_details['dlc_name'].encode('utf-8') + b'\x00'
@@ -295,7 +310,7 @@ class dlc_table_maker:
             if self.packages[self.package_list[i]]['item_id'] not in items_added:
                 item_tbl += self.make_item_entry(self.package_list[i])
                 items_added.append(self.packages[self.package_list[i]]['item_id'])
-        if self.dlc_details['game_type'] == 3:
+        if self.dlc_details['game_type'] in [3,18]:
             item_tbl = self.make_tbl_header(len(items_added), 'item', 'item_q') + item_tbl
         else:
             item_tbl = self.make_tbl_header(len(items_added), 'item') + item_tbl
