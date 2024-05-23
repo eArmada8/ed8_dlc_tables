@@ -38,39 +38,33 @@ def read_id_numbers(table):
 
 def get_all_id_numbers():
     if os.path.exists('data/text/'):
-        item_tables = glob.glob('data/text/**/t_item_en.tbl', recursive = True)
-        if len(item_tables) < 1:
-            item_tables = glob.glob('data/text/**/t_item.tbl', recursive = True)
-            if len(item_tables) < 1:
-                input("No master item table found, is this script in the root game folder?")
-            else:
-                item_tables = [item_tables[0]]
-        else:
-            item_tables = [item_tables[0]]
-        #In reading DLC tables, default to English, otherwise the first option available (usually dat)
-        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob('data/dlc/text/*')[0]+'/*')]
-        if 'dat_en' in dats:
-            dat_name = 'dat_en'
-        else:
-            dat_name = dat[0]
-        item_tables.extend(sorted(glob.glob('data/dlc/**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
+        folder_prefix = 'data/'
     elif os.path.exists('text/'): #Tokyo Xanadu eX+ mode
-        item_tables = glob.glob('text/**/t_item_en.tbl', recursive = True)
-        if len(item_tables) < 1:
-            item_tables = glob.glob('text/**/t_item.tbl', recursive = True)
-            if len(item_tables) < 1:
-                input("No master item table found, is this script in the root game folder?")
-            else:
-                item_tables = [item_tables[0]]
-        else:
-            item_tables = [item_tables[0]]
-        #DLC tables exist in dlc/text/___/dat regardless of language; different .bra archives exist per language
-        if os.path.exists('dlc/'):
-            item_tables.extend(sorted(glob.glob('dlc/**/dat/t_item.tbl', recursive = True)))
+        folder_prefix = ''
     else:
         input("No master item table found, is this script in the root game folder?")
+        return False
+    item_tables = glob.glob(folder_prefix+'text/**/t_item_en.tbl', recursive = True)
+    if len(item_tables) < 1:
+        item_tables = glob.glob(folder_prefix+'text/**/t_item.tbl', recursive = True)
+        if len(item_tables) < 1:
+            input("No master item table found, is this script in the root game folder?")
+        else:
+            item_tables = [item_tables[0]]
+    else:
+        item_tables = [item_tables[0]]
+    #In reading DLC tables, default to English, otherwise the first option available (usually dat)
+    dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'/dlc/text/*')[0]+'/*')]
+    if 'dat_en' in dats:
+        dat_name = 'dat_en'
+    else:
+        dat_name = dat[0]
+    item_tables.extend(sorted(glob.glob(folder_prefix+'dlc/**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
+    item_tables = [x.replace('\\','/') for x in item_tables]
     if os.path.exists('dev/'):
+        item_tables_dev = [x.replace('\\','/') for x in sorted(glob.glob('dev/'+folder_prefix+'dlc/text/**/{0}/t_item.tbl'.format(dat_name), recursive = True))]
         item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
+        item_tables.extend([x for x in item_tables_dev if x not in item_tables])
     all_item_numbers = {}
     all_dlc_item_numbers = {}
     for i in range(len(item_tables)):

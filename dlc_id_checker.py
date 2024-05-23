@@ -37,55 +37,54 @@ def read_id_numbers(table):
     return(item_numbers)
 
 def get_all_id_numbers():
-    if os.path.exists('data/dlc/'):
-        dlc_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True)
-    elif os.path.exists('dlc/'): # Tokyo Xanadu eX+ mode
-        dlc_tables = []
-        if os.path.exists('text/'):
-            dlc_tables.extend(glob.glob('text/**/t_dlc.tbl', recursive = True))
-        dlc_tables.extend(glob.glob('dlc/**/t_dlc.tbl', recursive = True))
+    dlc_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True) \
+        + glob.glob('text/**/t_dlc.tbl', recursive = True) \
+        + glob.glob('dlc/**/t_dlc.tbl', recursive = True)
+    dlc_tables = [x.replace('\\','/') for x in dlc_tables]
     if os.path.exists('dev/'):
+        dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/**/t_dlc.tbl', recursive = True)]
         dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
-    all_item_numbers = []
+        dlc_tables.extend([x for x in dlc_tables_dev if not x in dlc_tables])
+    all_dlc_numbers = []
     for i in range(len(dlc_tables)):
         print("Checking {0}...".format(dlc_tables[i]))
-        all_item_numbers.extend(read_id_numbers(dlc_tables[i]))
-    return(sorted(list(set(all_item_numbers))))
+        all_dlc_numbers.extend(read_id_numbers(dlc_tables[i]))
+    return(sorted(list(set(all_dlc_numbers))))
 
-def check_id_number(all_item_numbers, number = -1):
+def check_id_number(all_dlc_numbers, number = -1):
     while number == -1:
-        print("The current range of ID numbers is {0} to {1}.".format(min(all_item_numbers), max(all_item_numbers)))
+        print("The current range of ID numbers is {0} to {1}.".format(min(all_dlc_numbers), max(all_dlc_numbers)))
         number_input = input("What number would you like to check? ")
         try:
             number = int(number_input)
         except ValueError:
             print("Invalid Entry!")
-    return(number in all_item_numbers)
+    return(number in all_dlc_numbers)
 
 if __name__ == "__main__":
     # Set current directory
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    all_item_numbers = get_all_id_numbers()
+    all_dlc_numbers = get_all_id_numbers()
     if len(sys.argv) > 1:
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument('id_num', help="ID Number to check.")
         args = parser.parse_args()
-        if check_id_number(all_item_numbers, int(args.id_num)):
+        if check_id_number(all_dlc_numbers, int(args.id_num)):
             print("Item ID {0} already exists!".format(int(args.id_num)))
         else:
             print("Item ID {0} does not exist!".format(int(args.id_num)))
     else:
         number = -1
         while number == -1:
-            print("The current range of ID numbers is {0} to {1}.".format(min(all_item_numbers), max(all_item_numbers)))
+            print("The current range of ID numbers is {0} to {1}.".format(min(all_dlc_numbers), max(all_dlc_numbers)))
             number_input = input("What number would you like to check? (Press enter to quit) ")   
             if number_input == '':
                 break
             else:
                 try:
                     number = int(number_input)
-                    if check_id_number(all_item_numbers, number):
+                    if check_id_number(all_dlc_numbers, number):
                         print("Item ID {0} already exists!".format(number))
                     else:
                         print("Item ID {0} does not exist!".format(number))
