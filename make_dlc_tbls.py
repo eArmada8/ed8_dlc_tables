@@ -15,6 +15,7 @@ class dlc_table_maker:
             [self.dlc_details['game_type']])
         self.packages = self.get_pkg_details()
         self.package_list = list(self.packages.keys())
+        self.transform_counter = 0
 
     def get_dlc_details (self):
         if os.path.exists('dlc.json'):
@@ -213,6 +214,11 @@ class dlc_table_maker:
                     pkg_details['flags'] = 'S{}'.format(pkg_details['item_quantity'])
                 else:
                     pkg_details['flags'] = '0'
+            if not pkg_details['attach_point'] == 'null': #and 'attach_transform_data' not in pkg_details:
+                if os.path.exists(packages[i][:-4] + '.transform.csv'):
+                    with open(packages[i][:-4] + '.transform.csv', encoding='utf-8') as csvfile:
+                        transform_data = [row for row in csv.reader(csvfile, delimiter=',')]
+                        pkg_details['attach_transform_data'] = [dict(zip(transform_data[0],x)) for x in transform_data[1:]]
             pkg_dict[packages[i]] = pkg_details
             if pkg_details['item_id'] not in list(existing_items.keys()):
                 existing_items[pkg_details['item_id']] = pkg_details
@@ -278,6 +284,20 @@ class dlc_table_maker:
         attach_tbl_entry += self.packages[pkg_name]['attach_point'].encode() + b'\x00'
         return(b'AttachTableData\x00' + struct.pack("<H",len(attach_tbl_entry)) + attach_tbl_entry)
 
+    def make_attach_transform_entries (self, pkg_name):
+        transform_entries = b''
+        for entry in self.packages[pkg_name]['attach_transform_data']:
+            attach_transform_entry = struct.pack("<H", int(entry['char_id']))
+            if self.dlc_details['game_type'] == 5: #Reverie
+                attach_transform_entry += entry['costume_id'].encode('utf-8') + b'\x00'
+            attach_transform_entry += pkg_name.split('.pkg')[0].encode('utf-8') + b'\x00'
+            attach_transform_entry += entry['translate'].encode('utf-8') + b'\x00'
+            attach_transform_entry += entry['rotate'].encode('utf-8') + b'\x00'
+            attach_transform_entry += entry['scale'].encode('utf-8') + b'\x00'
+            transform_entries += b'AttachTransformData\x00' + struct.pack("<H",len(attach_transform_entry)) + attach_transform_entry
+            self.transform_counter += 1
+        return(transform_entries)
+
     def make_dlc_entry (self):
         if self.dlc_details['game_type'] == 18: #TXe
             dlc_tbl_entry = struct.pack("<H", self.dlc_details['dlc_id'])
@@ -320,9 +340,21 @@ class dlc_table_maker:
         return(item_tbl)
 
     def make_attach_tbl (self, write_table = True):
-        attach_tbl = self.make_tbl_header(len(self.package_list), 'AttachTableData')
+        self.transform_counter = 0
+        table_counter = len(self.package_list)
+        attach_tbl_data = b''
         for i in range(len(self.package_list)):
-            attach_tbl += self.make_attach_entry(self.package_list[i])
+            attach_tbl_data += self.make_attach_entry(self.package_list[i])
+            if not self.packages[self.package_list[i]]['attach_point'] == 'null'\
+                    and self.dlc_details['game_type'] in [4,5]\
+                    and 'attach_transform_data' in self.packages[self.package_list[i]]\
+                    and len(self.packages[self.package_list[i]]['attach_transform_data']) > 0:
+                attach_tbl_data += self.make_attach_transform_entries(self.package_list[i])
+        attach_tbl = struct.pack("<HI", table_counter+self.transform_counter, {3:1,4:2,5:2}[self.dlc_details['game_type']])
+        attach_tbl += 'AttachTableData'.encode() + b'\x00' + struct.pack("<I", table_counter)
+        if self.dlc_details['game_type'] in [4,5]:
+            attach_tbl += 'AttachTransformData'.encode() + b'\x00' + struct.pack("<I", self.transform_counter)
+        attach_tbl += attach_tbl_data
         if write_table == True:
             with open("t_attach.tbl","wb") as f:
                 f.write(attach_tbl)
