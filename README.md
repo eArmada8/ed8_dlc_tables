@@ -1,6 +1,6 @@
-# Trails of Cold Steel III / IV / into Reverie / Tokyo Xanadu eX+ DLC table maker for custom costumes.
+# Trails of Cold Steel II / III / IV / into Reverie / Tokyo Xanadu eX+ DLC table maker for custom costumes.
 
-This is a small script to write t_attach.tbl, t_dlc.tbl and t_item.tbl for making costume mods in Trails of Cold Steel III, IV and into Reverie NIS America releases and Tokyo Xanadu eX+ Aksys release for PC (DirectX 11).  Other platforms / CLE releases are not tested, so YMMV.
+This is a small script to write t_attach.tbl, t_dlc.tbl and t_item.tbl for making costume mods in Trails of Cold Steel II, III, IV and into Reverie XSeed / NIS America releases and Tokyo Xanadu eX+ Aksys release for PC (DirectX 11).  Other platforms / CLE releases are not tested, so YMMV.
 
 ## Credits
 
@@ -13,19 +13,19 @@ This tool uses the .csv output for t_name.tbl from the [tbled editor](https://gi
 
 ### make_dlc_tbls.py
 
-*This script expects 3 tables, ed83nisa.csv, ed84nisa.csv, ed85nisa.csv and txe_names.csv for CS3, CS4, Reverie and TXe.  (You only need the table for the games you are modding.)  They come with the release archive of this tool, but if you are downloading this tool from GitHub, you can generate them yourself.  Download the [tbled editor](https://git.sr.ht/~quf/tocs/tree/trunk/tbled/README.md) by Lukas Himbert.  Use it to open t_name.tbl from each game (located at* `{cold steel}/data/text/data` *or* `{cold steel}/data/text/data_en)` *then export to csv with the filename above.  For TXe, use the CS2 schema to read t_name.tbl.*
+*This script expects the following tables: ed82xseed.csv, ed83nisa.csv, ed84nisa.csv, ed85nisa.csv and txe_names.csv for CS2, CS3, CS4, Reverie and TXe, respectively.  (You only need the table for the games you are modding.)  They come with the release archive of this tool, but if you are downloading this tool from GitHub, you can generate them yourself.  Download the [tbled editor](https://git.sr.ht/~quf/tocs/tree/trunk/tbled/README.md) by Lukas Himbert.  Use it to open t_name.tbl from each game (located at* `{cold steel}/data/text/data` *or* `{cold steel}/data/text/data_en)` *then export to csv with the filename above.  For TXe, use the CS2 schema to read t_name.tbl.*
 
 Before you start, you will want to determine some information:
-1. DLC ID number:  This will be the same as the folder number in `{CS4/Reverie}/data/dlc/text/xxxx` or `{TXe}/dlc/text/xxxx` where xxxx is the 4 digit number of the folder.  I recommend keeping the number <200, but be sure to use a number that isn't already in use.  (*Note that TXe requires altering `TokyoXanadu.exe` to allow DLC IDs besides the standard 170,171,200,201,202,203.*)
+1. DLC ID number:  This will be the same as the folder number in `{CS2}/data/text_dlc/xxxx`, `{CS3/CS4/Reverie}/data/dlc/text/xxxx` or `{TXe}/dlc/text/xxxx` where xxxx is the 4 digit number of the folder.  I recommend keeping the number <250, but be sure to use a number that isn't already in use.  (*Note that TXe requires altering `TokyoXanadu.exe` to allow DLC IDs besides the standard 170,171,200,201,202,203.  I recommend using [SenPatcher](https://github.com/AdmiralCurtiss/SenPatcher)*)
 2. Item ID numbers:  You need to choose item numbers that are valid, but are not already in the game.
 
-You can use dlc_id_checker.py and item_id_checker.py to check for unused ID numbers.  Place the scripts inside your Trails of Cold Steel III/IV/Reverie folder (the root folder with the bin and data folders in it).  Run the scripts and it will tell you roughly what numbers are in use.  The easiest is to pick something slightly above the upper number, but do not go too high or the game will not accept the numbers.  For TXe, all the t_item.tbl and t_dlc.tbl files must be extracted from System.bra prior to use of these tools.  Use [`txe_file_extract.py`](https://github.com/eArmada8/ed8_inject/releases).
+You can use dlc_id_checker.py and item_id_checker.py to check for unused ID numbers.  Place the scripts inside your Trails of Cold Steel II/III/IV/Reverie folder (the root folder with the bin and data folders in it).  Run the scripts and it will tell you roughly what numbers are in use.  The easiest is to pick something slightly above the upper number, but do not go too high or the game will not accept the numbers.  For TXe, all the t_item.tbl and t_dlc.tbl files must be extracted from System.bra prior to use of these tools.  Use [`txe_file_extract.py`](https://github.com/eArmada8/ed8_inject/releases).
 
 Place all your .pkg files in a folder, and put make_dlc_tbls.py and csv files in the same folder.  Run make_dlc_tbls.py.  If there are .json files with settings, the script will just make the .tbl files, but the first time you run it (assuming you did not make the .json files by hand) it will ask you questions.
 
 Questions it will ask you:
 * DLC options:
-	1. Game type:  Enter 3, 4 or 5 for CS3, CS4 or NISA Reverie, or 18 for TXe.
+	1. Game type:  Enter 2, 3, 4 or 5 for CS2, CS3, CS4 or NISA Reverie, or 18 for TXe.
 	2. DLC ID:  This number should match the number of the folder in `{Base Folder}/data/dlc/text/xxxx` where xxxx is a 4 digit number folder that you are making.  Add leading zeros to the folder name to make 4 digits; e.g. if you chose 200 as your DLC ID, name the folder 0200.
 	3. DLC Name:  The name of the DLC that the user will see in the DLC menu
 	4. DLC Description:  The description of the DLC that the user will see in the DLC menu
@@ -41,7 +41,7 @@ Once you have answered all the questions, it will generate the 3 table files.  I
 
 ### dlc_conflict_resolver.py
 
-Place the scripts inside your Trails of Cold Steel III/IV/Reverie folder (the root folder with the bin and data folders in it) or your Tokyo Xanadu eX+ folder.  Run the script and it will tell you if there are multiple DLC tables using the same DLC numbers or the same item numbers in use.  When it finds two items using the same number, it will ask you which item you would like to reassign to a new number.  Be sure to pick the DLC you just installed; *do not renumber official Falcom items!*
+Place the scripts inside your Trails of Cold Steel II/III/IV/Reverie folder (the root folder with the bin and data folders in it) or your Tokyo Xanadu eX+ folder.  Run the script and it will tell you if there are multiple DLC tables using the same DLC numbers or the same item numbers in use.  When it finds two items using the same number, it will ask you which item you would like to reassign to a new number.  Be sure to pick the DLC you just installed; *do not renumber official Falcom items!*
 
 For DLC, it will not let you renumber DLC IDs that match the folder name.  This can lead to impossible situations - for example, if you number your DLC 95 and put it in folder `/data/dlc/text/0095` but it conflicts with an official Falcom 95, my script will not let you renumber the conflicting DLC *(and I highly discourage renumbering the official Falcom DLC)*.  In this case, rename the folder `/data/dlc/text/1195` or something else equally invalid, and the script will let you renumber the DLC.  Copy down the new number, and rename the folder to match.  For example, if you rename `/data/dlc/text/0095` to `/data/dlc/text/1195` and then the script changes the number from 95 to 180, then subsequently rename `/data/dlc/text/1195` to `/data/dlc/text/0180`.   *For TXe, it is `/dlc/text` instead of `/data/dlc/text`.*
 
@@ -55,7 +55,7 @@ Place in a folder with t_attach.tbl, t_item.tbl and t_dlc.tbl (all three should 
 
 This script will add DLC items to a shop, so that they can be purchased.
 
-- Obtain `t_shop.tbl` from the game text dat folder, generally `{Base Folder}/data/text/dat_en` or `{Base Folder}/data/text/dat`.  *For TXe, it is `/text` instead of `/data/text`.*
+- Obtain `t_shop.tbl` from the game text dat folder, generally `{Base Folder}/data/text/dat_en` or `{Base Folder}/data/text/dat`.  *For TXe, it is `/text` instead of `/data/text`.  For CS2, it is `{Base Folder}/data/text/dat_us`*
 - Put a copy of the original `t_shop.tbl` in a folder with this script, name it `t_shop.tbl.original`.  The script will never overwrite `t_shop.tbl.original`, but will write a new `t_shop.tbl` instead.
 - Make a folder with the shop_id number.  For example, 1041 is the reverie corridor costume shop, so make a `1041` folder.
 - Inside the folder, put json files generated by make_dlc_tbls.py.  The script will read the item_id numbers from the jsons and add each one to the shop.

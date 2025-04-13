@@ -38,6 +38,7 @@ def read_id_numbers(table):
 
 def get_all_id_numbers():
     dlc_tables = glob.glob('data/dlc/**/t_dlc.tbl', recursive = True) \
+        + glob.glob('data/text_dlc/**/t_dlc.tbl', recursive = True) \
         + glob.glob('text/**/t_dlc.tbl', recursive = True) \
         + glob.glob('dlc/**/t_dlc.tbl', recursive = True)
     dlc_tables = [x.replace('\\','/') for x in dlc_tables]

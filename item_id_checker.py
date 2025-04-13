@@ -44,7 +44,10 @@ def get_all_id_numbers():
     else:
         input("No master item table found, is this script in the root game folder?")
         return False
-    item_tables = glob.glob(folder_prefix+'text/**/t_item_en.tbl', recursive = True)
+    if os.path.exists(folder_prefix+'text/dat_us/t_item.tbl'):
+        item_tables = [folder_prefix+'text/dat_us/t_item.tbl']
+    else:
+        item_tables = glob.glob(folder_prefix+'text/**/t_item_en.tbl', recursive = True)
     if len(item_tables) < 1:
         item_tables = glob.glob(folder_prefix+'text/**/t_item.tbl', recursive = True)
         if len(item_tables) < 1:
@@ -54,15 +57,20 @@ def get_all_id_numbers():
     else:
         item_tables = [item_tables[0]]
     #In reading DLC tables, default to English, otherwise the first option available (usually dat)
-    dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'/dlc/text/*')[0]+'/*')]
-    if 'dat_en' in dats:
-        dat_name = 'dat_en'
+    if os.path.exists (folder_prefix+'text_dlc'): #CS2 mode
+        dlc_folder_prefix = folder_prefix+'text_dlc/'
+        dat_name = 'dat_us'
     else:
-        dat_name = dat[0]
-    item_tables.extend(sorted(glob.glob(folder_prefix+'dlc/**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
+        dlc_folder_prefix = folder_prefix+'dlc/'
+        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'dlc/text/*')[0]+'/*')]
+        if 'dat_en' in dats:
+            dat_name = 'dat_en'
+        else:
+            dat_name = dats[0]
+    item_tables.extend(sorted(glob.glob(dlc_folder_prefix+'**/{0}/t_item.tbl'.format(dat_name), recursive = True)))
     item_tables = [x.replace('\\','/') for x in item_tables]
     if os.path.exists('dev/'):
-        item_tables_dev = [x.replace('\\','/') for x in sorted(glob.glob('dev/'+folder_prefix+'dlc/text/**/{0}/t_item.tbl'.format(dat_name), recursive = True))]
+        item_tables_dev = [x.replace('\\','/') for x in sorted(glob.glob('dev/'+dlc_folder_prefix+'text/**/{0}/t_item.tbl'.format(dat_name), recursive = True))]
         item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
         item_tables.extend([x for x in item_tables_dev if x not in item_tables])
     all_item_numbers = {}

@@ -1,6 +1,6 @@
 # Short script to generate a set of dlc tables for custom costumes in
-# Trails of Cold Steel III / IV / into Reverie.  Uses the decoded t_name.tbl
-# from tbled.
+# Trails of Cold Steel II / III / IV / into Reverie and Tokyo Xanadu eX+.
+# Uses the decoded t_name.tbl from tbled.
 #
 # GitHub eArmada8/ed8_dlc_tables
 
@@ -11,8 +11,8 @@ class dlc_table_maker:
         random.seed()
         self.random_number = round(random.random()*888+2000)
         self.dlc_details = self.get_dlc_details()
-        self.name_dict = self.get_names({3:'ed83nisa.csv', 4:'ed84nisa.csv', 5:'ed85nisa.csv', 18:'txe_names.csv'}\
-            [self.dlc_details['game_type']])
+        self.name_dict = self.get_names({2:'ed82xseed.csv', 3:'ed83nisa.csv',\
+            4:'ed84nisa.csv', 5:'ed85nisa.csv', 18:'txe_names.csv'}[self.dlc_details['game_type']])
         self.packages = self.get_pkg_details()
         self.package_list = list(self.packages.keys())
         self.transform_counter = 0
@@ -23,14 +23,14 @@ class dlc_table_maker:
                 dlc_details = json.loads(f.read())
         else:
             dlc_details = {}
-        while 'game_type' not in dlc_details.keys() or dlc_details['game_type'] not in [3,4,5,18]:
-            item_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
+        while 'game_type' not in dlc_details.keys() or dlc_details['game_type'] not in [2,3,4,5,18]:
+            item_type_raw = input("Which game? [2=CS2, 3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
             if item_type_raw == '':
                 dlc_details['game_type'] = 4
             else:
                 try:
                     dlc_details['game_type'] = int(item_type_raw)
-                    if dlc_details['game_type'] not in [3,4,5,18]:
+                    if dlc_details['game_type'] not in [2,3,4,5,18]:
                         print("Invalid entry!")
                 except ValueError:
                     print("Invalid entry!")
@@ -188,7 +188,7 @@ class dlc_table_maker:
                     except ValueError:
                         print("Invalid entry!")
             while 'item_sort_id' not in pkg_details.keys():
-                pkg_details['item_sort_id'] = self.random_number + {3:0, 4:3000, 5:10000, 18: 2000}[self.dlc_details['game_type']]
+                pkg_details['item_sort_id'] = self.random_number + {2:0, 3:0, 4:3000, 5:10000, 18: 2000}[self.dlc_details['game_type']]
                 self.random_number += 1
             while 'item_name' not in pkg_details.keys() or pkg_details['item_name'] == '':
                 pkg_details['item_name'] = str(input("Item Name for {0}: ".format(packages[i]))).encode('utf-8').decode('utf-8')
@@ -250,6 +250,12 @@ class dlc_table_maker:
             item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
             item_tbl_entry += struct.pack("<B55H", *[0]*56)
             item_tbl_entry += struct.pack("<BHH", 99, self.packages[pkg_name]['item_sort_id'], 0) # Second number is sort, third number may also be sort?
+        elif self.dlc_details['game_type'] == 2: #CS2
+            item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['item_type'])
+            item_tbl_entry += struct.pack("<B", 0)
+            item_tbl_entry += struct.pack("<B", self.packages[pkg_name]['target_type'])
+            item_tbl_entry += struct.pack("<26H", *[0]*26)
+            item_tbl_entry += struct.pack("<B2H", 99, self.packages[pkg_name]['item_sort_id'], self.dlc_details['dlc_id'])
         elif self.dlc_details['game_type'] == 18: #TXe
             item_tbl_entry += struct.pack("<H", self.packages[pkg_name]['item_type'])
             item_tbl_entry += struct.pack("<27H", *[0]*27)
@@ -266,14 +272,14 @@ class dlc_table_maker:
             pass
         elif self.dlc_details['game_type'] == 18: #TXe
             item_tbl_entry += struct.pack("<2IB", *[0]*3)
-        else: #Defaults to Cold Steel III/IV
+        else: #Defaults to Cold Steel II/III/IV
             item_tbl_entry += struct.pack("<2I", 0, 0)
         return(b'item\x00' + struct.pack("<H",len(item_tbl_entry)) + item_tbl_entry)
 
     def make_attach_entry (self, pkg_name):
         attach_tbl_entry = struct.pack("<3HI", self.packages[pkg_name]['chr_id_a'],\
             {193:5, 194:67, 195: 9, 454: 5}[self.packages[pkg_name]['item_type']], 0, self.packages[pkg_name]['item_id'])
-        if self.dlc_details['game_type'] == 3: #CS3
+        if self.dlc_details['game_type'] in [2,3]: #CS2/CS3
             attach_tbl_entry += struct.pack("<6H", *[0]*6)
         elif self.dlc_details['game_type'] == 18: #TXe
             attach_tbl_entry += struct.pack("<4I", 0,0,0,255)
@@ -299,15 +305,17 @@ class dlc_table_maker:
         return(transform_entries)
 
     def make_dlc_entry (self):
-        if self.dlc_details['game_type'] == 18: #TXe
+        if self.dlc_details['game_type'] in [2, 18]: #CS2/TXe
             dlc_tbl_entry = struct.pack("<H", self.dlc_details['dlc_id'])
         else:
             dlc_tbl_entry = struct.pack("<2H", self.dlc_details['dlc_id'], self.dlc_details['dlc_sort_id'])
         if self.dlc_details['game_type'] == 3: #CS3
             dlc_tbl_entry += struct.pack("<2H", *[0]*2)
-        elif self.dlc_details['game_type'] == 18: #TXe
+        elif self.dlc_details['game_type'] in [2, 18]: #CS2/TXe
             # I have no idea if there is a sort ID here, every entry I examined had the same values
             dlc_tbl_entry += struct.pack("<2HI", 65535, 100, 0)
+            if self.dlc_details['game_type'] == 2:
+                dlc_tbl_entry += struct.pack("<H", 0)
         else: #Defaults to Cold Steel IV / Reverie
             dlc_tbl_entry += struct.pack("<8H", *[0]*8)
         dlc_tbl_entry += self.dlc_details['dlc_name'].encode('utf-8') + b'\x00'
@@ -350,7 +358,7 @@ class dlc_table_maker:
                     and 'attach_transform_data' in self.packages[self.package_list[i]]\
                     and len(self.packages[self.package_list[i]]['attach_transform_data']) > 0:
                 attach_tbl_data += self.make_attach_transform_entries(self.package_list[i])
-        attach_tbl = struct.pack("<HI", table_counter+self.transform_counter, {3:1,4:2,5:2}[self.dlc_details['game_type']])
+        attach_tbl = struct.pack("<HI", table_counter+self.transform_counter, {2:1,3:1,4:2,5:2,18:1}[self.dlc_details['game_type']])
         attach_tbl += 'AttachTableData'.encode() + b'\x00' + struct.pack("<I", table_counter)
         if self.dlc_details['game_type'] in [4,5]:
             attach_tbl += 'AttachTransformData'.encode() + b'\x00' + struct.pack("<I", self.transform_counter)

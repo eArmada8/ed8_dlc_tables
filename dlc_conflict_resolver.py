@@ -3,7 +3,7 @@
 #
 # GitHub eArmada8/ed8_dlc_tables
 
-import struct, os, glob, sys, shutil
+import struct, re, os, glob, sys, shutil
 
 try:
     import blowfish
@@ -34,19 +34,21 @@ def detect_ed8_game():
         return(game_type)
     else:
         return(-1) # Not in a ed8 root directory
-    if 'ed8_3' in [x[0:5] for x in game_exes]:
+    if 'ed8_2' in [x[0:5] for x in game_exes]:
+        game_type = 2
+    elif 'ed8_3' in [x[0:5] for x in game_exes]:
         game_type = 3
     elif 'ed8_4' in [x[0:5] for x in game_exes]:
         game_type = 4
     elif 'ed8_ps5' in [x[0:7] for x in game_exes] or 'hnk.exe' in game_exes:
         game_type = 5
-    if game_type not in [3,4,5,18]:
-        game_input_raw = input("Game type detection failed (likely non-NISA CS3/CS4/Reverie or Aksys TXe).  Try with manual type?  Input 3, 4, 5, 18 (TXe).  ")
+    if game_type not in [2,3,4,5,18]:
+        game_input_raw = input("Game type detection failed (likely non-XSeed CS2, non-NISA CS3/CS4/Reverie or Aksys TXe).  Try with manual type?  Input 2, 3, 4, 5, 18 (TXe).  ")
         try:
             game_input = int(game_input_raw)
             if game_input in [3,4,5,18]:
                 game_type = game_input
-                print("\nAttempting to parse using {0} table format.".format({3:'CS3', 4:'CS4', 5:'Reverie', 18:'TXe'}[game_type]))
+                print("\nAttempting to parse using {0} table format.".format({2:'CS2', 3:'CS3', 4:'CS4', 5:'Reverie', 18:'TXe'}[game_type]))
                 print("If the item names are not correct, do not attempt to use!\n")
         except ValueError:
             pass
@@ -110,7 +112,8 @@ def decrypt_haji_cle_file (table_filename):
 # Returns length (true block size)
 def read_table_section (f, entry_type, game_type = 0):
     # 0 is null-terminated string
-    schema = {3: {'item': [4, 0, 127, 0, 0, 8], 'item_q': [4, 0, 127, 0, 0, 20], 'dlc': [8, 0, 0, 80]}, \
+    schema = {2: {'item': [4, 0, 60, 0, 0, 9], 'item_q': [4, 0, 60, 0, 0, 9], 'dlc': [12, 0, 0, 80]}, \
+        3: {'item': [4, 0, 127, 0, 0, 8], 'item_q': [4, 0, 127, 0, 0, 20], 'dlc': [8, 0, 0, 80]}, \
         4: {'item': [4, 0, 150, 0, 0, 8], 'item_q': [4, 0, 150, 0, 0, 20], 'dlc':  [20, 0, 0, 80]}, \
         5: {'item': [4, 0, 141, 0, 0], 'item_e': [4, 0, 141, 0, 0, 10], 'item_q': [4, 0, 141, 0, 0, 22], 'dlc': [20, 0, 0, 80]},\
         18: {'item': [4, 0, 62, 0, 0, 9], 'item_q': [4, 0, 62, 0, 0, 9], 'dlc': [10, 0, 0, 80]}}
@@ -184,21 +187,21 @@ def get_all_id_numbers(item_tables):
     return(all_item_numbers)
 
 def get_item_name_by_item_entry(item_entry, game_type = 0):
-    if game_type in [3,4,5,18]:
+    if game_type in [2,3,4,5,18]:
         with open(item_entry['table'], 'rb') as f:
             f.seek(item_entry['offset'] + 6,0)
             read_null_terminated_string(f) #Flags
-            f.seek({3:0x7f, 4:0x96, 5:0x8d, 18:0x3e}[game_type],1)
+            f.seek({2:0x3c, 3:0x7f, 4:0x96, 5:0x8d, 18:0x3e}[game_type],1)
             item_name = read_null_terminated_string(f)
         return(item_name)
     else:
         return("")
 
 def get_dlc_name_by_dlc_entry(dlc_entry, game_type = 0):
-    if game_type in [3,4,5]:
+    if game_type in [2,3,4,5,18]:
         with open(dlc_entry['table'], 'rb') as f:
             f.seek(dlc_entry['offset'],0)
-            f.seek({3:10, 4:22, 5:22, 18:12}[game_type],1)
+            f.seek({2:14,3:10, 4:22, 5:22, 18:12}[game_type],1)
             item_name = read_null_terminated_string(f)
         return(item_name)
     else:
@@ -243,7 +246,7 @@ def replace_item_id_in_t_attach (table, old_id, new_id):
     return
 
 def replace_item_id_in_t_dlc (table, old_id, new_id, game_type = 0):
-    if game_type in [3,4,5]:
+    if game_type in [2,3,4,5,18]:
         with open(table, 'r+b') as f:
             total_entries, num_sections = struct.unpack("<hi",f.read(6))
             section_data = []
@@ -259,6 +262,8 @@ def replace_item_id_in_t_dlc (table, old_id, new_id, game_type = 0):
                     f.seek(6,1)
                     if game_type in [4,5]:
                         f.seek(12,1)
+                    elif game_type == 2:
+                        f.seek(4,1)
                     elif game_type == 18:
                         f.seek(2,1)
                     name = read_null_terminated_string(f)
@@ -274,15 +279,19 @@ def replace_item_id_in_t_dlc (table, old_id, new_id, game_type = 0):
 
 def replace_item_id(dlc_id, old_id, new_id, game_type = 0):
     folder_prefix = ''
-    if game_type in [3,4,5]:
+    if game_type in [2,3,4,5]:
         folder_prefix = 'data/'
-    item_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)]
-    attach_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)]
-    dlc_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)]
+    if game_type == 2:
+        dlc_folder_prefix = folder_prefix+'text_dlc/'
+    else:
+        dlc_folder_prefix = folder_prefix+'dlc/text/'
+    item_tables = [x.replace('\\','/') for x in glob.glob(dlc_folder_prefix+'{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)]
+    attach_tables = [x.replace('\\','/') for x in glob.glob(dlc_folder_prefix+'{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)]
+    dlc_tables = [x.replace('\\','/') for x in glob.glob(dlc_folder_prefix+'{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)]
     if os.path.exists('dev/'):
-        item_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+folder_prefix+'dlc/text/{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)]
-        attach_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+folder_prefix+'dlc/text/{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)]
-        dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)]
+        item_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+dlc_folder_prefix+'{:04d}/**/t_item.tbl'.format(dlc_id), recursive = True)]
+        attach_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+dlc_folder_prefix+'{:04d}/**/t_attach.tbl'.format(dlc_id), recursive = True)]
+        dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+dlc_folder_prefix+'{:04d}/**/t_dlc.tbl'.format(dlc_id), recursive = True)]
         item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
         item_tables.extend([x for x in item_tables_dev if x not in item_tables])
         attach_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in attach_tables]
@@ -299,11 +308,15 @@ def replace_item_id(dlc_id, old_id, new_id, game_type = 0):
 
 def replace_dlc_id(dlc_folder_id, old_id, new_id, game_type = 0):
     folder_prefix = ''
-    if game_type in [3,4,5]:
+    if game_type in [2,3,4,5]:
         folder_prefix = 'data/'
-    dlc_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)]
+    if game_type == 2:
+        dlc_folder_prefix = folder_prefix+'text_dlc/'
+    else:
+        dlc_folder_prefix = folder_prefix+'dlc/text/'
+    dlc_tables = [x.replace('\\','/') for x in glob.glob(dlc_folder_prefix+'{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)]
     if os.path.exists('dev/'):
-        dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+folder_prefix+'dlc/text/{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)]
+        dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+dlc_folder_prefix+'{:04d}/**/t_dlc.tbl'.format(dlc_folder_id), recursive = True)]
         dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
         dlc_tables.extend([x for x in dlc_tables_dev if x not in dlc_tables])
     for i in range(len(dlc_tables)):
@@ -314,9 +327,9 @@ def resolve_dlc(allow_low_numbers = False):
     global attempt_cle_decrypt
     game_type = detect_ed8_game()
     folder_prefix = ''
-    if game_type in [3,4,5]:
+    if game_type in [2,3,4,5]:
         folder_prefix = 'data/'
-    text_folders = [x.replace('\\','/').split('/')[-1] for x in glob.glob(folder_prefix+'text*')]
+    text_folders = [x.replace('\\','/').split('/')[-1] for x in glob.glob(folder_prefix+'text*') if not x.replace('\\','/').split('/')[-1] == 'text_dlc']
     if len(text_folders) > 0:
         if len(text_folders) > 1:
             print("Multiple text folders found!  Process which set?")
@@ -337,35 +350,43 @@ def resolve_dlc(allow_low_numbers = False):
             if len(item_tables) < 1:
                 input("No master item table found, is this script in the root game folder?")
             else:
-                item_tables = [item_tables[0]]
+                if len(item_tables) > 1 and 'dat_us' in item_tables[1]:
+                    item_tables = [item_tables[1]]
+                else:
+                    item_tables = [item_tables[0]]
         else:
             item_tables = [item_tables[0]]
         #In reading DLC tables, default to English, otherwise the first option available (usually dat)
-        dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'dlc/{}/*'.format(text_folder))[0]+'/*')]
-        if len(dats) > 1:
-            print("Multiple dat language folders found!  Process which set?")
-            for i in range(len(dats)):
-                print("{0}. {1}".format(i+1, dats[i]))
-            i = -1
-            while not i in range(len(dats)):
-                try:
-                    i = int(input("Please select a folder set: "))-1
-                except:
-                    pass
-            dat_name = dats[i]
+        if os.path.exists (folder_prefix+'text_dlc'): #CS2 mode
+            dlc_folder_prefix = folder_prefix+'text_dlc/'
+            dat_name = 'dat_us'
         else:
-            dat_name = dats[0]
-        item_tables.extend(sorted(glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True)))
+            dlc_folder_prefix = folder_prefix+'dlc/{}/'.format(text_folder)
+            dats = [x.replace('\\','/').split('/')[-1] for x in glob.glob(glob.glob(folder_prefix+'dlc/{}/*'.format(text_folder))[0]+'/*')]
+            if len(dats) > 1:
+                print("Multiple dat language folders found!  Process which set?")
+                for i in range(len(dats)):
+                    print("{0}. {1}".format(i+1, dats[i]))
+                i = -1
+                while not i in range(len(dats)):
+                    try:
+                        i = int(input("Please select a folder set: "))-1
+                    except:
+                        pass
+                dat_name = dats[i]
+            else:
+                dat_name = dats[0]
+        item_tables.extend(sorted(glob.glob(dlc_folder_prefix+'**/{}/t_item.tbl'.format(dat_name), recursive = True)))
         item_tables = [x.replace('\\','/') for x in item_tables]
-        dlc_tables = [x.replace('\\','/') for x in glob.glob(folder_prefix+'dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
+        dlc_tables = [x.replace('\\','/') for x in glob.glob(dlc_folder_prefix+'**/{}/t_dlc.tbl'.format(dat_name), recursive = True)]
         if os.path.exists('dev/'):
-            item_tables_dev = [x.replace('\\','/') for x in sorted(glob.glob('dev/'+folder_prefix+'dlc/{0}/**/{1}/t_item.tbl'.format(text_folder, dat_name), recursive = True))]
-            dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+folder_prefix+'dlc/{0}/**/{1}/t_dlc.tbl'.format(text_folder, dat_name), recursive = True)]
+            item_tables_dev = [x.replace('\\','/') for x in sorted(glob.glob('dev/'+dlc_folder_prefix+'**/{}/t_item.tbl'.format(dat_name), recursive = True))]
+            dlc_tables_dev = [x.replace('\\','/') for x in glob.glob('dev/'+dlc_folder_prefix+'**/{}/t_dlc.tbl'.format(dat_name), recursive = True)]
             item_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in item_tables]
             item_tables.extend([x for x in item_tables_dev if x not in item_tables])
             dlc_tables = ['dev/'+x if os.path.exists('dev/'+x) else x for x in dlc_tables]
             dlc_tables.extend([x for x in dlc_tables_dev if x not in dlc_tables])
-        dlc_folder_numbers = [int(x.split(text_folder+'/')[1].split('/dat')[0]) for x in dlc_tables]
+        dlc_folder_numbers = [re.findall(r"\d+", x) for x in dlc_tables]
         encrypted_tables = [x for x in item_tables+dlc_tables if is_cle_encrypted(x)]
         if len(encrypted_tables) > 0 and attempt_cle_decrypt == True:
             if "blowfish" in sys.modules:

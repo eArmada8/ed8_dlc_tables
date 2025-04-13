@@ -32,7 +32,7 @@ def read_id_numbers_with_offsets(table):
             block_data = f.read(block_size)
             table_data.append({'type': entry_type, 'data': block_data})
             if entry_type == 'ShopItem' and block_size == 10:
-                game_type = 18
+                game_type = 2 # CS2 and TXe mode
     return(table_data, section_data, game_type)
 
 def read_shop_id_numbers (table_data):
@@ -53,7 +53,7 @@ def build_shop_item(shop_id, item_id, game_type = 4):
     if game_type in [3,4,5]:
         entry = struct.pack('<4H', shop_id, item_id, 0, 0)
         entry += struct.pack('<B4H', 0, 0, 0, 65535, 0)
-    else: #TXe
+    else: #CS2/TXe
         entry = struct.pack('<5H', shop_id, item_id, 0, 0, 0)
     return({'type':'ShopItem','data':entry})
 

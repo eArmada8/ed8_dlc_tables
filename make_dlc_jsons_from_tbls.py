@@ -13,14 +13,14 @@ def read_null_terminated_string(f):
 
 def input_gametype():
     game_type = 0
-    while game_type not in [3,4,5,18]:
-        game_type_raw = input("Which game? [3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
+    while game_type not in [2,3,4,5,18]:
+        game_type_raw = input("Which game? [2=CS2, 3=CS3, 4=CS4, 5=NISA Reverie, 18=TXe, leave blank for 4] ")
         if game_type_raw == '':
             game_type = 4
         else:
             try:
                 game_type = int(game_type_raw)
-                if game_type not in [3,4,5,18]:
+                if game_type not in [2,3,4,5,18]:
                     print("Invalid entry!")
             except ValueError:
                 print("Invalid entry!")
@@ -44,7 +44,9 @@ def read_dlc_table(dlc_table, game_type = 4):
                     dlc['dlc_id'], = struct.unpack("<H", f.read(2))
                     if game_type in [3,4,5]:
                         dlc['dlc_sort_id'], = struct.unpack("<H", f.read(2))
-                    if game_type == 3:
+                    if game_type == 2:
+                        f.seek(10,1)
+                    elif game_type == 3:
                         f.seek(4,1)
                     elif game_type == 18:
                         f.seek(8,1)
@@ -79,7 +81,7 @@ def read_attach_table(attach_table, game_type = 4):
             if entry_type == 'AttachTableData':
                 attach = {}
                 attach['char_id'], attach['item_type'], unk0, attach['item_id'] = struct.unpack("<4H", f.read(8))
-                if game_type == 3:
+                if game_type in [2,3]:
                     f.seek(14,1)
                 elif game_type == 18:
                     f.seek(18,1)
@@ -146,6 +148,13 @@ def read_item_table(item_table, game_type = 4):
                         f.seek(8,1)
                         item['target_type'], = struct.unpack("<B", f.read(1))
                         f.seek(112,1)
+                        item['item_sort_id'], = struct.unpack("<H", f.read(2))
+                        f.seek(2,1)
+                    elif game_type == 2:
+                        item['item_type'], = struct.unpack("<B", f.read(1))
+                        f.seek(1,1)
+                        item['target_type'], = struct.unpack("<B", f.read(1))
+                        f.seek(53,1)
                         item['item_sort_id'], = struct.unpack("<H", f.read(2))
                         f.seek(2,1)
                     elif game_type == 18:
